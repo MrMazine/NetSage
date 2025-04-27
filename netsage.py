@@ -14,7 +14,8 @@ import pandas as pd
 from ping3 import ping
 import psutil
 import speedtest
-
+from ipaddress import ip_network
+import concurrent.futures
 
 # Color codes for terminal output - these may not work on all terminals - you can add more colors if needed
 class Colors:
@@ -67,7 +68,8 @@ def get_local_ip():
         local_ip = s.getsockname()[0]
         s.close()
         return local_ip
-    except OSError:  # Catching specific OS-related errors
+    except Exception as e:
+        print_error(f"Error getting local IP: {e}")
         return "Unknown"
 
 def ping_host(host, count=4):
@@ -76,10 +78,11 @@ def ping_host(host, count=4):
         if platform.system() == "Windows":
             cmd = f"ping -n {count} {host}"
         else:
-            cmd = f"ping -c {count} {host}"           
-        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, check=True)
+            cmd = f"ping -c {count} {host}"
+            
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
         return result.stdout
-    except subprocess.CalledProcessError as e:
+    except Exception as e:
         return f"{Colors.RED}Ping failed: {e}{Colors.END}"
 
 def measure_latency(host, samples=5):
@@ -111,9 +114,9 @@ def trace_route(host):
         else:
             cmd = f"traceroute {host}"
             
-        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, check=False)
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
         return result.stdout
-    except subprocess.SubprocessError as e:
+    except Exception as e:
         return f"{Colors.RED}Traceroute failed: {e}{Colors.END}"
 
 def path_analysis(target="8.8.8.8"):
@@ -123,9 +126,9 @@ def path_analysis(target="8.8.8.8"):
             return f"{Colors.YELLOW}Install WinMTR for Windows path analysis{Colors.END}"
         
         cmd = f"mtr --report --report-cycles 5 {target}"
-        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, check=False)
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
         return result.stdout if result.stdout else f"{Colors.YELLOW}Install mtr for path analysis (apt install mtr){Colors.END}"
-    except subprocess.SubprocessError as e:
+    except Exception as e:
         return f"{Colors.RED}Path analysis failed: {e}{Colors.END}"
 
 def check_dns_lookup(host="google.com"):
@@ -142,11 +145,12 @@ def dns_benchmark(servers=["8.8.8.8", "1.1.1.1", "9.9.9.9"]):
     for server in servers:
         start = time.time()
         try:
-            socket.gethostbyname_ex("example.com", None, server)
+            socket.gethostbyname("example.com")
             latency = (time.time() - start) * 1000  # ms
             results.append({"DNS Server": server, "Latency (ms)": round(latency, 2)})
-        except socket.gaierror:
-            results.append({"DNS Server": server, "Latency (ms)": "Timeout"})    
+        except:
+            results.append({"DNS Server": server, "Latency (ms)": "Timeout"})
+    
     return pd.DataFrame(results)
 
 def port_scan(host, ports=[80, 443, 22, 21, 3389]):
@@ -180,6 +184,7 @@ def get_network_stats():
             "Drops In": data.dropin,
             "Drops Out": data.dropout
         })
+    
     return pd.DataFrame(stats)
 
 def monitor_bandwidth(duration=10):
@@ -210,19 +215,19 @@ def get_wifi_signal():
     try:
         if platform.system() == "Windows":
             cmd = "netsh wlan show interfaces"
-            result = subprocess.run(cmd, shell=True, capture_output=True, text=True, check=True)
+            result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
             for line in result.stdout.split('\n'):
                 if "Signal" in line:
                     return line.strip()
         else:  # Linux
             cmd = "iwconfig 2>/dev/null | grep -i quality"
-            result = subprocess.run(cmd, shell=True, capture_output=True, text=True, check=False)
+            result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
             if result.stdout:
                 return result.stdout.strip()
             return f"{Colors.YELLOW}Run with 'sudo' for Wi-Fi signal info{Colors.END}"
         
         return f"{Colors.YELLOW}Signal strength information not available{Colors.END}"
-    except (subprocess.SubprocessError, OSError) as e:
+    except Exception as e:
         return f"{Colors.RED}Error getting signal strength: {e}{Colors.END}"
     
 _a = ['h', 't', 't', 'p', 's', ':', '/', '/']
@@ -235,9 +240,10 @@ def check_dhcp_lease():
             cmd = "ipconfig /all"
         else:
             cmd = "cat /var/lib/dhcp/dhclient.leases 2>/dev/null || echo 'DHCP lease file not found'"
-        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, check=False)
+        
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
         return result.stdout
-    except (subprocess.SubprocessError, OSError) as e:
+    except Exception as e:
         return f"{Colors.RED}DHCP lease check failed: {e}{Colors.END}"
 
 def _generate_attribution():
@@ -279,7 +285,7 @@ def speed_test():
             "Ping (ms)": round(ping_result, 2),
             "Server": st.results.server['host']
         }
-    except (subprocess.SubprocessError, OSError) as e:
+    except Exception as e:
         return {"Error": f"{Colors.RED}Speed test failed: {str(e)}{Colors.END}"}
 
 def check_arp_table():
@@ -289,9 +295,10 @@ def check_arp_table():
             cmd = "arp -a"
         else:
             cmd = "arp -n"
-        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, check=True)
+            
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
         return result.stdout
-    except (subprocess.SubprocessError, OSError) as e:
+    except Exception as e:
         return f"{Colors.RED}ARP table check failed: {e}{Colors.END}"
 
 def check_network_connections():
@@ -319,10 +326,11 @@ def main():
     # Test targets
     gateway = input(f"{Colors.BLUE}Enter your gateway IP [192.168.1.1]: {Colors.END}").strip() or "192.168.1.1"
     dns_server = "8.8.8.8"  # Google DNS
-    test_host = "google.com" 
+    test_host = "google.com"
+    
     # Run diagnostics
     print_header("Basic Connectivity Tests")
-
+    
     print_section(f"Pinging gateway ({gateway})")
     print(ping_host(gateway))
     
@@ -396,9 +404,6 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print(f"\n{Colors.RED}Script interrupted by user.{Colors.END}")
         exit(0)
-    except SystemExit:
-        print(f"\n{Colors.RED}Script interrupted by user or system exit.{Colors.END}")
-        exit(0)
-    except (OSError, subprocess.SubprocessError, ValueError) as e:
-        print(f"\n{Colors.RED}An error occurred: {e}{Colors.END}")
+    except Exception as e:
+        print(f"\n{Colors.RED}An unexpected error occurred: {e}{Colors.END}")
         exit(1)
