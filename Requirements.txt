@@ -1,0 +1,4 @@
+pandas
+ping3
+psutil
+speedtest-cli
