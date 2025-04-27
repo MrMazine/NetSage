@@ -26,14 +26,6 @@ Whether you are maintaining a corporate infrastructure, auditing your own system
 
 ---
 
-## 🛠️ Parameters You Can Change
-
-- **`ports` list:**  
-  Edit the `ports` list inside the script to scan the ports you need. Example:
-
-  ```python
-  ports = [22, 80, 443, 8080, 3306]
-
 ## ⚙️ Customization
 ### Changing Ports to Scan
 By default, the script scans common ports like `80 (HTTP)`, `443 (HTTPS)`, `22 (SSH)`, `21 (FTP)`, and `3389 (RDP)`.
@@ -41,10 +33,23 @@ By default, the script scans common ports like `80 (HTTP)`, `443 (HTTPS)`, `22 (
 To **add** or **modify** the list of ports:
 
 - Find this function inside the code:
-  ```python
-    def port_scan(host, ports=[80, 443, 22, 21, 3389]):
+     ```python
+     def port_scan(host, ports=[80, 443, 22, 21, 3389]):
 - Add more ports into the ports list. (Example — adding SMTP (25) and MySQL (3306)) :
-  ```python
-    def port_scan(host, ports=[80, 443, 22, 21, 3389, 25, 3306]):
+     ```python
+     def port_scan(host, ports=[80, 443, 22, 21, 3389, 25, 3306]):
 
+## 🖥 Requirements
+- Python 3.7+
+- Internet connection (for external tests like speed test)
+### Install dependencies:
+```bash
+pip install -r requirements.txt
 
+## 🏆 Attribution
+Created and maintained by **MrMazine**.
+
+## 📢 Final Note
+This tool was built to help IT and cybersecurity professionals save time and energy, allowing you to focus on fixing network issues instead of searching for them.
+
+Contributions, suggestions, and improvements are always welcome!
